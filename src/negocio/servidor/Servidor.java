@@ -10,10 +10,8 @@ public class Servidor {
 	public static final int PORTA = 1234;
 	public static final String HOST = "";
 
-	private static Stop stop;
-
-	public static void main(String[] args) {
-		Servidor.stop = new Stop();
+	public void run() {
+		Stop stop = new Stop();
 
 		try {
 			ServerSocket servidor = new ServerSocket(Servidor.PORTA);
@@ -21,11 +19,15 @@ public class Servidor {
 
 			while (true) {
 				Socket jogador = servidor.accept();
-				Servidor.stop.adicionarJogador(jogador);
+				stop.adicionarJogador(jogador);
 			}
-			
+
 		} catch (Exception e) {
-			e.printStackTrace();
+			System.out.println("Servidor quebrou");
 		}
+	}
+
+	public static void main(String[] args) {
+		new Servidor().run();
 	}
 }

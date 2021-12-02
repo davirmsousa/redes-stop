@@ -1,5 +1,9 @@
 package negocio.jogo;
 
+import negocio.util.Utilitario;
+import negocio.util.mensagem.Mensagem;
+import negocio.util.mensagem.ObjetivoMensagem;
+
 import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -17,73 +21,78 @@ vai ter as regras e fluxos gerais do jogo como
 
 public class Stop {
 
-	private final int MAX_JOGADORES = 5;
-	private final int MAX_RODADAS = 5;
+	private final long MAX_TEMPO_RODADA = 5000;
+	private final int MAX_JOGADORES = 1;
+	private final int MAX_RODADAS = 2;
 
 	private ArrayList<String> categorias;
 	private ArrayList<Socket> jogadores;
 	private ArrayList<Rodada> rodadas;
+	private int rodadaAtual;
 
 	public Stop() {
-		jogadores = new ArrayList<Socket>();
-		rodadas = new ArrayList<Rodada>();
+		this.jogadores = new ArrayList<Socket>();
+		this.rodadas = new ArrayList<Rodada>();
+		this.rodadaAtual = 1;
 	}
 
 	/**
 	 * Adiciona um novo jogador na partida e decide se o jogo deve começar.
-	 * O jogador receberá duas respostas (boolean, string) informando
-	 * se foi adicionado ou não na partida
+	 * O jogador receberá a respostas informando se foi adicionado ou não na partida
 	 */
 	public void adicionarJogador(Socket jogador) throws IOException {
 		if (jogador == null) {
 			throw new NullPointerException("jogador não pode ser nulo");
 		}
 
-		if (this.jogadores.size() > this.MAX_JOGADORES) {
-			String mensagem = "O jogo já começou, espere a próxima partida.";
-			this.mandarMensagemParaJogador(jogador, mensagem, false);
+		if (this.jogadores.size() == this.MAX_JOGADORES) {
+			Mensagem mensagem = new Mensagem(ObjetivoMensagem.FALHA_REGISTRO);
+			Utilitario.mandarMensagemParaJogador(jogador, mensagem);
 			return;
 		}
 
 		this.jogadores.add(jogador);
 
 		int jogadoresRestantes = this.MAX_JOGADORES - this.jogadores.size();
-		String mensagem = "Seja Bem-Vindo!" + (jogadoresRestantes > 0 ?
+		String strMensagem = "Seja Bem-Vindo!" + (jogadoresRestantes > 0 ?
 				" Aguardando mais " + jogadoresRestantes + " jogador(es)." :
 				" O Jogo começará em instantes");
-		this.mandarMensagemParaJogador(jogador, mensagem, true);
+		Mensagem mensagem = new Mensagem(ObjetivoMensagem.SUCESSO_REGISTRO)
+				.setMensagem(strMensagem);
 
-		this.iniciarPartida();
+		Utilitario.mandarMensagemParaJogador(jogador, mensagem);
+
+		new Thread(this::iniciarPartida).start();
 	}
 
 	/**
 	 * Inicia a partida após validar se ja chegou ao numero necessario de jogadores.
-	 * Responsável por iniciar e gerenciar as rodadas
 	 */
-	private void iniciarPartida() {
+	private synchronized void iniciarPartida() {
 		if (this.jogadores.size() != this.MAX_JOGADORES) {
 			return;
 		}
 
-		for (int rodada = 0; rodada < this.MAX_RODADAS; rodada++) {
-			this.iniciarRodada();
-		}
+		this.iniciarRodada(this.rodadaAtual);
 	}
 
 	/**
-	 * Inicia e gerencia uma rodada ate o seu fim.
+	 * Inicia a rodada. como o processo eh assincrono, o termino do metodo
+	 * nao significa o termino da rodada
 	 */
-	private void iniciarRodada() {
+	private void iniciarRodada(int numero) {
+		System.out.println("rodada " + numero + " iniciada");
 
-	}
+		Rodada rodada = new Rodada(numero, this.jogadores, this.categorias);
+		this.rodadas.add(rodada);
 
-	/**
-	 * Manda duas mensagens para o jogador, a mensagem em si e um booleano para indicar o teor da mensagem
-	 * (sucesso ou neutro = true; erro ou negacao = false).
-	 */
-	private void mandarMensagemParaJogador(Socket jogador, String mensagem, boolean sucesso) throws IOException {
-		DataOutputStream jogadorOutput = new DataOutputStream(jogador.getOutputStream());
-		jogadorOutput.writeBoolean(sucesso);
-		jogadorOutput.writeUTF(mensagem);
+		// solicitar a resposta aos jogadores
+		rodada.solicitarRespostas();
+
+		// começar a contar o tempo
+		rodada.iniciarTimer(this.MAX_TEMPO_RODADA);
+
+		// começar a escutar todos os jogadores para coletar as respostas
+		rodada.esperarPorRespostas();
 	}
 }
