@@ -1,6 +1,7 @@
 package negocio.jogo;
 
 import negocio.util.Utilitario;
+import negocio.util.DicionarioBr;
 import negocio.util.mensagem.Mensagem;
 import negocio.util.mensagem.ObjetivoMensagem;
 import org.javatuples.Pair;
@@ -204,13 +205,12 @@ public class Rodada {
 
     /**
      * valida as respostas do jogador.
-     * (ate o momento so vamos validar a inicial)
      * @param respostas respostas que o jogador mandou
      * @return pontuacao do jogador
      */
     public int processarRespostas(ArrayList<String> respostas) {
         return respostas.stream().mapToInt(resposta ->
-                resposta.startsWith(this.inicialSorteada.toString()) ? this.pontosPorAcerto : 0)
+                DicionarioBr.encontraPalavraNoDicionario(resposta) ? this.pontosPorAcerto : 0)
                 .sum();
     }
 
