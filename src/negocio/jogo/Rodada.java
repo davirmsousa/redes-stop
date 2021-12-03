@@ -22,18 +22,26 @@ ela vai ter os dados relacionados a rodada, ou seja
 
 public class Rodada {
     private final int numero;
+    private final long tempoDaRodada;
+    private final int pontosPorAcerto;
     private final Character inicialSorteada;
     private final ArrayList<Socket> jogadores;
     private final ArrayList<String> categorias;
+    private final Runnable callbackDeFimDaRodada;
 
+    private int contagemDeConfirmacoes;
     private boolean jogadoresRespondendo;
     private Thread threadDeContagemDeTempo;
-    private HashMap<Socket, Pair<Integer, ArrayList<String>>> respostas;
+    private final HashMap<Socket, Pair<Integer, ArrayList<String>>> respostas;
 
-    private final int PONTOS_POR_ACERTO = 5;
 
-    public Rodada(int numero, ArrayList<Socket> jogadores, ArrayList<String> categorias) {
+    public Rodada(int numero, long tempoDaRodada, int pontosPorAcerto, ArrayList<Socket> jogadores,
+                  ArrayList<String> categorias, Runnable callbackDeFimDaRodada) {
+
         this.respostas = new HashMap<Socket, Pair<Integer, ArrayList<String>>>();
+        this.callbackDeFimDaRodada = callbackDeFimDaRodada;
+        this.pontosPorAcerto = pontosPorAcerto;
+        this.tempoDaRodada = tempoDaRodada;
         this.jogadoresRespondendo = false;
         this.categorias = categorias;
         this.jogadores = jogadores;
@@ -58,19 +66,27 @@ public class Rodada {
     }
 
     /**
-     * get da propriedade inicialSorteada
-     * @return valor de inicialSorteada
+     * concentra o fluxo de acoes necessarios para executar uma rodada
      */
-    public Character obterInicialSorteada() {
-        return this.inicialSorteada;
+    public void iniciar() {
+        // solicitar a resposta aos jogadores
+        this.solicitarRespostas();
+
+        // começar a contar o tempo
+        this.iniciarTimer();
+
+        // começar a escutar todos os jogadores para coletar as respostas
+        this.esperarPorRespostas();
     }
 
     /**
      * manda mensagens para os jogadores para que comecem a responder
      */
-    public void solicitarRespostas() {
+    private void solicitarRespostas() {
         System.out.println("solicitando respostas");
 
+        // mandar mensagem pedindo para os jogadores responderem e enviando as categorias e
+        // a letra sorteada
         this.jogadores.forEach(jogador -> {
             try {
 
@@ -85,16 +101,15 @@ public class Rodada {
 
     /**
      * inicia a contagem do tempo que os jogadores tem para responder
-     * @param tempoDeResposta tempo maximo em milisegundos para responder
      */
-    public void iniciarTimer(long tempoDeResposta) {
+    private void iniciarTimer() {
         System.out.println("contando o tempo");
 
         this.threadDeContagemDeTempo = new Thread(() -> {
             try {
                 // dormir pelo tempo permitido de resposta, quando acordar significa que o tempo acabou
                 // e que ninguem terminou, pq se nao a thread teria sido encerrada
-                Thread.sleep(tempoDeResposta);
+                Thread.sleep(this.tempoDaRodada);
 
                 System.out.println("tempo acabou");
 
@@ -110,7 +125,7 @@ public class Rodada {
      * Inicia um conjunto de threads para esperar a resposta dos jogadores.
      * Depois que o primeiro jogador terminar, todos os outros devem parar de responder.
      */
-    public void esperarPorRespostas() {
+    private void esperarPorRespostas() {
         System.out.println("esperando respostas");
 
         this.jogadoresRespondendo = true;
@@ -166,7 +181,8 @@ public class Rodada {
      * para que eles parem de responder os itens da rodada.
      * @param jogador socket do jogador que nao vai receber a mensagem de interrupcao
      */
-    public void interromperRespostaDosJogadores(Socket jogador) {
+    public synchronized void interromperRespostaDosJogadores(Socket jogador) {
+        // se nao tem jogador respondendo nao tem pq interromper
         if (!this.jogadoresRespondendo)
             return;
 
@@ -194,7 +210,7 @@ public class Rodada {
      */
     public int processarRespostas(ArrayList<String> respostas) {
         return respostas.stream().mapToInt(resposta ->
-                resposta.startsWith(this.inicialSorteada.toString()) ? PONTOS_POR_ACERTO : 0)
+                resposta.startsWith(this.inicialSorteada.toString()) ? this.pontosPorAcerto : 0)
                 .sum();
     }
 
@@ -205,8 +221,10 @@ public class Rodada {
         if (this.respostas.size() < this.jogadores.size())
             return;
 
+        this.contagemDeConfirmacoes = 0;
+
         // TODO: gerar relatorio
-        String relatorio = "";
+        String relatorio = "RELATORIO RODADA";
 
         // mandar o relatorio para todos os jogadores
         this.jogadores.forEach(jogador -> {
@@ -214,6 +232,7 @@ public class Rodada {
                 Mensagem mensagem = new Mensagem(ObjetivoMensagem.RELATORIO_RODADA)
                         .setConteudo(relatorio);
                 Utilitario.mandarMensagemParaJogador(jogador, mensagem);
+                System.out.println("1+ relatorio rodada enviado");
             } catch (IOException ignored) { }
         });
 
@@ -222,9 +241,14 @@ public class Rodada {
             new Thread(() -> {
                 try {
                     Mensagem mensagem = this.lerMensagem(jogador, ObjetivoMensagem.CONFIRMACAO_RELATORIO_RODADA);
+                    System.out.println("1+ confirm relatorio recebida");
+                    this.contagemDeConfirmacoes++;
 
-                    // a ideia aqui era fazer a contagem de confirmacoes para poder iniciar a prox rodada,
-                    // mas quem inicia a prox rodada eh a Stop kkkkk
+                    // verificar se todos os jogadores confirmaram e entao chamar o callback
+                    // para iniciar a proxima rodada
+                    if (this.contagemDeConfirmacoes == this.jogadores.size()) {
+                        this.callbackDeFimDaRodada.run();
+                    }
                 } catch (IOException | ClassNotFoundException ignored) { }
             }).start();
         });

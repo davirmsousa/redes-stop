@@ -7,6 +7,7 @@ import negocio.util.mensagem.ObjetivoMensagem;
 import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 /*
 classe para gerenciar o jogo.
@@ -22,6 +23,7 @@ vai ter as regras e fluxos gerais do jogo como
 public class Stop {
 
 	private final long MAX_TEMPO_RODADA = 5000;
+	private final int PONTOS_POR_ACERTO = 5;
 	private final int MAX_JOGADORES = 1;
 	private final int MAX_RODADAS = 2;
 
@@ -31,6 +33,7 @@ public class Stop {
 	private int rodadaAtual;
 
 	public Stop() {
+		this.categorias = new ArrayList<String>(Arrays.asList("cat1", "cart2", "cart3", "cart4"));
 		this.jogadores = new ArrayList<Socket>();
 		this.rodadas = new ArrayList<Rodada>();
 		this.rodadaAtual = 1;
@@ -83,16 +86,46 @@ public class Stop {
 	private void iniciarRodada(int numero) {
 		System.out.println("rodada " + numero + " iniciada");
 
-		Rodada rodada = new Rodada(numero, this.jogadores, this.categorias);
+		// callback que a Rodada chama quando a rodada termina
+		Runnable callbackDeFimDaRodada = () -> {
+			// verificar se chegou na ultima rodada
+			if (rodadaAtual > this.MAX_RODADAS) {
+				this.enviarRelatorioDaPartida();
+				return;
+			}
+
+			System.out.println("iniciando proxima rodada");
+
+			// dormir e iniciar a proxima rodada
+			try {
+				Thread.sleep(5000);
+			} catch (InterruptedException ignored) { }
+
+			this.iniciarRodada(++rodadaAtual);
+		};
+
+		Rodada rodada = new Rodada(numero, this.MAX_TEMPO_RODADA, this.PONTOS_POR_ACERTO, this.jogadores,
+				this.categorias, callbackDeFimDaRodada);
+
 		this.rodadas.add(rodada);
 
-		// solicitar a resposta aos jogadores
-		rodada.solicitarRespostas();
+		rodada.iniciar();
+	}
 
-		// começar a contar o tempo
-		rodada.iniciarTimer(this.MAX_TEMPO_RODADA);
+	/**
+	 * gerar o relatorio de fim da partida
+	 */
+	private void enviarRelatorioDaPartida() {
+		String relatorio = "RELATORIO FINAL";
 
-		// começar a escutar todos os jogadores para coletar as respostas
-		rodada.esperarPorRespostas();
+		// mandar o relatorio para todos os jogadores
+		this.jogadores.forEach(jogador -> {
+			try {
+				Mensagem mensagem = new Mensagem(ObjetivoMensagem.RELATORIO_PARTIDA)
+						.setConteudo(relatorio);
+				Utilitario.mandarMensagemParaJogador(jogador, mensagem);
+				System.out.println("1+ relatorio final enviado");
+			} catch (IOException ignored) { }
+		});
 	}
 }

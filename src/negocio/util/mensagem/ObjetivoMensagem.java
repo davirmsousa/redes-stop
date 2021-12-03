@@ -11,8 +11,10 @@ public enum ObjetivoMensagem {
 
     RESPOSTA_RODADA(5, "Cliente terminou de responder os itens da rodada."),
 
-    RELATORIO_RODADA(5, "A rodada terminou, este é o resultado geral."),
-    CONFIRMACAO_RELATORIO_RODADA(5, "O jogador está pronto para a próxima rodada.");
+    RELATORIO_RODADA(6, "A rodada terminou, este é o resultado geral."),
+    CONFIRMACAO_RELATORIO_RODADA(7, "O jogador está pronto para a próxima rodada."),
+
+    RELATORIO_PARTIDA(8, "A partida terminou, este é o resultado final.");
 
     private final int valor;
     private final String mensagem;
