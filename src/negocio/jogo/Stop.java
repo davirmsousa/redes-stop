@@ -9,17 +9,6 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-/*
-classe para gerenciar o jogo.
-vai ter as regras e fluxos gerais do jogo como
-- adicionar jogadores e decidir quando o jogo inicia
-- iniciar/validar/finalizar uma rodada
-	- ao iniciar, criar uma nova rodada e permitir que os jogadores respondam
-	- apos terminarem de responder, validar as iniciais das palavras
-	  (acho que nao vai dar pra deixar que os jogadores validem entre eles)
-	- ao finalizar, mandar um relatorio para os jogadores informando a pontuação geral
-*/
-
 public class Stop {
 
 	private final long MAX_TEMPO_RODADA = 5000;
@@ -27,9 +16,9 @@ public class Stop {
 	private final int MAX_JOGADORES = 1;
 	private final int MAX_RODADAS = 2;
 
-	private ArrayList<String> categorias;
-	private ArrayList<Socket> jogadores;
-	private ArrayList<Rodada> rodadas;
+	private final ArrayList<String> categorias;
+	private final ArrayList<Socket> jogadores;
+	private final ArrayList<Rodada> rodadas;
 	private int rodadaAtual;
 
 	public Stop() {
@@ -84,19 +73,14 @@ public class Stop {
 	 * nao significa o termino da rodada
 	 */
 	private void iniciarRodada(int numero) {
-		System.out.println("rodada " + numero + " iniciada");
 
 		// callback que a Rodada chama quando a rodada termina
 		Runnable callbackDeFimDaRodada = () -> {
-			// verificar se chegou na ultima rodada
 			if (rodadaAtual > this.MAX_RODADAS) {
 				this.enviarRelatorioDaPartida();
 				return;
 			}
 
-			System.out.println("iniciando proxima rodada");
-
-			// dormir e iniciar a proxima rodada
 			try {
 				Thread.sleep(5000);
 			} catch (InterruptedException ignored) { }
@@ -118,13 +102,11 @@ public class Stop {
 	private void enviarRelatorioDaPartida() {
 		String relatorio = "RELATORIO FINAL";
 
-		// mandar o relatorio para todos os jogadores
 		this.jogadores.forEach(jogador -> {
 			try {
 				Mensagem mensagem = new Mensagem(ObjetivoMensagem.RELATORIO_PARTIDA)
 						.setConteudo(relatorio);
 				Utilitario.mandarMensagemParaJogador(jogador, mensagem);
-				System.out.println("1+ relatorio final enviado");
 			} catch (IOException ignored) { }
 		});
 	}

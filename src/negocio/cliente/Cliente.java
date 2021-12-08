@@ -10,17 +10,6 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Scanner;
 
-/*
-classe do cliente/jogador.
-ela vai ser a responsavel por iniciar a conexao com o servidor e realizar as acoes dos jogadores
-quando a classe Stop pedir.
-
-deve estar preparado para quando a classe Stop pedir para inserir as respostas da rodada,
-vai receber a letra da rodada e as categorias, deve responder com uma lista de strings
-
-no final do jogo o cliente recebe um relatorio do jogo
-*/
-
 public class Cliente {
 
 	private Socket cliente;
@@ -55,25 +44,24 @@ public class Cliente {
 	 * acao que deve tomar usando como base o enum ObjetivoMensagem
 	 */
 	private void tratarMensagens() throws IOException, ClassNotFoundException {
-		while (true) {
+		boolean jogoTerminou = false;
+		while (!jogoTerminou) {
 			Mensagem mensagem = this.lerMensagem();
 
 			switch (ObjetivoMensagem.intParaEnum(mensagem.objetivoMensagem)) {
 				case RESPONDER_RODADA:
-					System.out.println("RESPONDER_RODADA " + mensagem.mensagem);
 					this.responderRodada(mensagem.lista, mensagem.character);
 					break;
 				case PARAR_RESPOSTA_RODADA:
-					System.out.println("PARAR_RESPOSTA_RODADA " + mensagem.mensagem);
 					this.interromperRodada();
 					break;
 				case RELATORIO_RODADA:
-					System.out.println("RELATORIO_RODADA " + mensagem.mensagem);
 					this.exibirRelatorio(mensagem.conteudo);
 					break;
 				case RELATORIO_PARTIDA:
-					System.out.println("RELATORIO_PARTIDA " + mensagem.mensagem);
 					this.exibirRelatorio(mensagem.conteudo);
+					System.out.println("O jogo terminou!");
+					jogoTerminou = true;
 					break;
 			}
 		}
@@ -102,8 +90,6 @@ public class Cliente {
 					}
 
 					this.respostas.add(resposta);
-
-					System.out.println("->> " + resposta);
 				}
 
 				this.enviarResposta();
@@ -117,7 +103,6 @@ public class Cliente {
 	 * interrompe a thread de resposta dos itens da rodada e envia as respostas
 	 */
 	private void interromperRodada() throws IOException {
-		// caso a thread esteja rodando, encerra ela
 		if (this.threadDeResposta != null && this.threadDeResposta.isAlive()) {
 			this.threadDeResposta.interrupt();
 		}
@@ -129,7 +114,6 @@ public class Cliente {
 	 * envia as respostas do jogador
 	 */
 	private synchronized void enviarResposta() throws IOException {
-		// caso ja tenha enviado a resposta, nao o faz novamente
 		if (this.respostas == null)
 			return;
 
@@ -138,8 +122,6 @@ public class Cliente {
 
 		Utilitario.mandarMensagemParaJogador(this.cliente, mensagem);
 		this.respostas = null;
-
-		System.out.println("respostas enviadas");
 	}
 
 	/**
@@ -161,8 +143,7 @@ public class Cliente {
 		this.lerLinha("pressione qualquer tecla para continuar.");
 		Mensagem msg = new Mensagem(ObjetivoMensagem.CONFIRMACAO_RELATORIO_RODADA);
 		Utilitario.mandarMensagemParaJogador(this.cliente, msg);
-
-		System.out.println("A próxima rodada vai começar em instantes.");
+		System.out.println("Finalizando rodada...");
 	}
 
 	/**
