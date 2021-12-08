@@ -137,7 +137,7 @@ public class Rodada {
                 try {
                     ArrayList<String> respostas = this.lerMensagem(jogador, ObjetivoMensagem.RESPOSTA_RODADA).lista;
                     int pontos = processarRespostas(respostas);
-                    System.out.println("1+ resposta recebida");
+                    System.out.println("1+ resposta recebida (" + pontos + "pts)");
 
                     this.respostas.put(jogador, new Pair<Integer, ArrayList<String>>(pontos, respostas));
                 } catch (IOException | ClassNotFoundException ignored) { }
@@ -210,7 +210,8 @@ public class Rodada {
      */
     public int processarRespostas(ArrayList<String> respostas) {
         return respostas.stream().mapToInt(resposta ->
-                DicionarioBr.encontraPalavraNoDicionario(resposta) ? this.pontosPorAcerto : 0)
+                    resposta.startsWith(this.inicialSorteada.toString()) &&
+                    DicionarioBr.encontraPalavraNoDicionario(resposta) ? this.pontosPorAcerto : 0)
                 .sum();
     }
 

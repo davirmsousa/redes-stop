@@ -90,11 +90,10 @@ public class Cliente {
 		this.threadDeResposta = new Thread(() -> {
 			try {
 
-				// TODO: fluxo de resposta
-				// a cada insert do jogador adicionar em this.respostas pq quando a thread for abortada alas vao estar salvas
+				System.out.println("Letra da rodada: " + inicialSorteada);
 
 				for (String categoria : categorias) {
-					String resposta = this.lerLinha("sua resposta [" + categoria + "]: ");
+					String resposta = this.lerLinha("sua resposta para a categoria " + categoria + ": ");
 
 					// precisa verificar se a thread foi interrompida pq o scanner
 					// simplesmente ignora isso
