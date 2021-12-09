@@ -10,7 +10,7 @@ import java.util.Arrays;
 
 public class Stop {
 
-	private final long MAX_TEMPO_RODADA = 15000;
+	private final long MAX_TEMPO_RODADA = 120000;
 	private final int PONTOS_POR_ACERTO = 5;
 	private final int MAX_JOGADORES = 2;
 	private final int MAX_RODADAS = 3;
@@ -25,10 +25,9 @@ public class Stop {
 		this.rodadas = new ArrayList<Rodada>();
 		this.rodadaAtual = 1;
 
-
 		this.categorias = new ArrayList<String>(Arrays.asList(
-				"Nomes",
-				"Marcas",
+				"Nome/Sobrenome",
+				"Animal",
 				"Frutas"
 		));
 	}

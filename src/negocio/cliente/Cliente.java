@@ -97,9 +97,7 @@ public class Cliente {
 				}
 
 				this.enviarResposta();
-			} catch (IOException | InterruptedException ignored) {
-				System.out.println("Ocorreu um erro inesperado.");
-			}
+			} catch (IOException | InterruptedException ignored) { }
 		});
 
 		this.threadDeResposta.start();

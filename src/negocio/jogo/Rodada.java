@@ -53,7 +53,7 @@ public class Rodada {
      * iniciais.
      */
     private Character sortearInicial() {
-        ArrayList<Character> excecoes = new ArrayList<Character>(Arrays.asList('k', 'w', 'y'));
+        ArrayList<Character> excecoes = new ArrayList<Character>(Arrays.asList('k', 'w', 'y', 'x', 'z'));
         Random random = new Random();
 
         char inicial;
@@ -103,9 +103,7 @@ public class Rodada {
                 Thread.sleep(this.tempoDaRodada);
                 this.interromperRespostaDosJogadores();
                 this.enviarRelatorioDaRodada();
-            } catch (InterruptedException ignored) {
-                ignored.printStackTrace();
-            }
+            } catch (InterruptedException ignored) { }
         });
 
         threadDeContagemDeTempo.start();
