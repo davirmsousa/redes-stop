@@ -25,17 +25,9 @@ public class Cliente {
 	public void conectar(String host, int porta) {
 		try {
 			this.cliente = new Socket(host, porta);
-
-			Mensagem mensagem = this.lerMensagem();
-			System.out.println(mensagem.mensagem);
-
-			if (mensagem.objetivoMensagem == ObjetivoMensagem.FALHA_REGISTRO.obterValor()) {
-				return;
-			}
-
 			this.tratarMensagens();
 		} catch (Exception e) {
-			e.printStackTrace();
+			System.out.println("Ocorreu um erro inesperado.");
 		}
 	}
 
@@ -44,11 +36,25 @@ public class Cliente {
 	 * acao que deve tomar usando como base o enum ObjetivoMensagem
 	 */
 	private void tratarMensagens() throws IOException, ClassNotFoundException {
-		boolean jogoTerminou = false;
-		while (!jogoTerminou) {
+		boolean parar = false;
+
+		while (!parar) {
 			Mensagem mensagem = this.lerMensagem();
 
 			switch (ObjetivoMensagem.intParaEnum(mensagem.objetivoMensagem)) {
+				case SUCESSO_REGISTRO:
+					System.out.println(mensagem.mensagem);
+					break;
+				case FALHA_REGISTRO:
+					System.out.println(mensagem.mensagem);
+					parar = true;
+					break;
+				case CADASTRO_INICIAL:
+					Mensagem msg = new Mensagem(ObjetivoMensagem.CADASTRO_INICIAL)
+							.setConteudo(this.lerLinha(mensagem.mensagem))
+							.setMensagem("Nome de usuario");
+					Utilitario.mandarMensagemParaJogador(this.cliente, msg);
+					break;
 				case RESPONDER_RODADA:
 					this.responderRodada(mensagem.lista, mensagem.character);
 					break;
@@ -56,12 +62,12 @@ public class Cliente {
 					this.interromperRodada();
 					break;
 				case RELATORIO_RODADA:
-					this.exibirRelatorio(mensagem.conteudo);
+					this.exibirRelatorio(mensagem.conteudo, false);
 					break;
 				case RELATORIO_PARTIDA:
-					this.exibirRelatorio(mensagem.conteudo);
+					this.exibirRelatorio(mensagem.conteudo, true);
 					System.out.println("O jogo terminou!");
-					jogoTerminou = true;
+					parar = true;
 					break;
 			}
 		}
@@ -83,8 +89,6 @@ public class Cliente {
 				for (String categoria : categorias) {
 					String resposta = this.lerLinha("sua resposta para a categoria " + categoria + ": ");
 
-					// precisa verificar se a thread foi interrompida pq o scanner
-					// simplesmente ignora isso
 					if (this.threadDeResposta.isInterrupted()) {
 						throw new InterruptedException();
 					}
@@ -93,7 +97,9 @@ public class Cliente {
 				}
 
 				this.enviarResposta();
-			} catch (IOException | InterruptedException ignored) { }
+			} catch (IOException | InterruptedException ignored) {
+				System.out.println("Ocorreu um erro inesperado.");
+			}
 		});
 
 		this.threadDeResposta.start();
@@ -129,11 +135,13 @@ public class Cliente {
 	 * no final o usuario precisa confirmar o fim da rodada para que
 	 * a proxima seja iniciada
 	 * @param relatorio relatorio retornado pelo jogo
+	 * @param relatorioFinal se esse eh o relatorio de final do jogo
 	 */
-	private void exibirRelatorio(String relatorio) throws IOException {
-		// TODO: printar relatorio
-		System.out.println(relatorio);
-		this.esperarConfirmacaoDeFimDaRodada();
+	private void exibirRelatorio(String relatorio, boolean relatorioFinal) throws IOException {
+		System.out.println("\n" + relatorio + "\n");
+
+		if (!relatorioFinal)
+			this.esperarConfirmacaoDeFimDaRodada();
 	}
 
 	/**

@@ -3,6 +3,8 @@ package negocio.util.mensagem;
 import java.util.NoSuchElementException;
 
 public enum ObjetivoMensagem {
+    CADASTRO_INICIAL(0, ""),
+
     SUCESSO_REGISTRO(1, "Seja Bem-Vindo!"),
     FALHA_REGISTRO(2, "O jogo já começou, espere a próxima partida."),
 

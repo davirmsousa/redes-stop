@@ -5,41 +5,46 @@ import negocio.util.mensagem.Mensagem;
 import negocio.util.mensagem.ObjetivoMensagem;
 
 import java.io.*;
-import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 
 public class Stop {
 
-	private final long MAX_TEMPO_RODADA = 5000;
+	private final long MAX_TEMPO_RODADA = 15000;
 	private final int PONTOS_POR_ACERTO = 5;
-	private final int MAX_JOGADORES = 1;
-	private final int MAX_RODADAS = 2;
+	private final int MAX_JOGADORES = 2;
+	private final int MAX_RODADAS = 3;
 
 	private final ArrayList<String> categorias;
-	private final ArrayList<Socket> jogadores;
+	private final ArrayList<Jogador> jogadores;
 	private final ArrayList<Rodada> rodadas;
 	private int rodadaAtual;
 
 	public Stop() {
-		this.categorias = new ArrayList<String>(Arrays.asList("cat1", "cart2", "cart3", "cart4"));
-		this.jogadores = new ArrayList<Socket>();
+		this.jogadores = new ArrayList<Jogador>();
 		this.rodadas = new ArrayList<Rodada>();
 		this.rodadaAtual = 1;
+
+
+		this.categorias = new ArrayList<String>(Arrays.asList(
+				"Nomes",
+				"Marcas",
+				"Frutas"
+		));
 	}
 
 	/**
 	 * Adiciona um novo jogador na partida e decide se o jogo deve começar.
 	 * O jogador receberá a respostas informando se foi adicionado ou não na partida
 	 */
-	public void adicionarJogador(Socket jogador) throws IOException {
+	public void adicionarJogador(Jogador jogador) throws IOException {
 		if (jogador == null) {
 			throw new NullPointerException("jogador não pode ser nulo");
 		}
 
 		if (this.jogadores.size() == this.MAX_JOGADORES) {
 			Mensagem mensagem = new Mensagem(ObjetivoMensagem.FALHA_REGISTRO);
-			Utilitario.mandarMensagemParaJogador(jogador, mensagem);
+			Utilitario.mandarMensagemParaJogador(jogador.getSocket(), mensagem);
 			return;
 		}
 
@@ -52,7 +57,7 @@ public class Stop {
 		Mensagem mensagem = new Mensagem(ObjetivoMensagem.SUCESSO_REGISTRO)
 				.setMensagem(strMensagem);
 
-		Utilitario.mandarMensagemParaJogador(jogador, mensagem);
+		Utilitario.mandarMensagemParaJogador(jogador.getSocket(), mensagem);
 
 		new Thread(this::iniciarPartida).start();
 	}
@@ -76,14 +81,16 @@ public class Stop {
 
 		// callback que a Rodada chama quando a rodada termina
 		Runnable callbackDeFimDaRodada = () -> {
-			if (rodadaAtual > this.MAX_RODADAS) {
+			if (rodadaAtual >= this.MAX_RODADAS) {
 				this.enviarRelatorioDaPartida();
 				return;
 			}
 
 			try {
 				Thread.sleep(5000);
-			} catch (InterruptedException ignored) { }
+			} catch (InterruptedException ignored) {
+				ignored.printStackTrace();
+			}
 
 			this.iniciarRodada(++rodadaAtual);
 		};
@@ -100,14 +107,26 @@ public class Stop {
 	 * gerar o relatorio de fim da partida
 	 */
 	private void enviarRelatorioDaPartida() {
-		String relatorio = "RELATORIO FINAL";
+		StringBuilder relatorio = new StringBuilder("RELATORIO FINAL\n");
+		for (Jogador jogador : this.jogadores) {
+			int pontosTotais = this.rodadas.stream()
+					.mapToInt(rodada -> rodada.obterPontosDoJogador(jogador))
+					.sum();
+
+			relatorio.append(jogador.getNome())
+					.append(": ")
+					.append(pontosTotais)
+					.append(" pts;\n");
+		}
 
 		this.jogadores.forEach(jogador -> {
 			try {
 				Mensagem mensagem = new Mensagem(ObjetivoMensagem.RELATORIO_PARTIDA)
-						.setConteudo(relatorio);
-				Utilitario.mandarMensagemParaJogador(jogador, mensagem);
-			} catch (IOException ignored) { }
+						.setConteudo(relatorio.toString());
+				Utilitario.mandarMensagemParaJogador(jogador.getSocket(), mensagem);
+			} catch (IOException ignored) {
+				ignored.printStackTrace();
+			}
 		});
 	}
 }

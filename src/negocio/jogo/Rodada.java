@@ -14,31 +14,24 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Random;
 
-/*
-classe que representa uma rodada.
-ela vai ter os dados relacionados a rodada, ou seja
-- letra sorteada
-- respostas e pontuacao dos participantes
-*/
-
 public class Rodada {
     private final int numero;
     private final long tempoDaRodada;
     private final int pontosPorAcerto;
     private final Character inicialSorteada;
-    private final ArrayList<Socket> jogadores;
+    private final ArrayList<Jogador> jogadores;
     private final ArrayList<String> categorias;
     private final Runnable callbackDeFimDaRodada;
 
     private int contagemDeConfirmacoes;
     private boolean jogadoresRespondendo;
     private Thread threadDeContagemDeTempo;
-    private final HashMap<Socket, Pair<Integer, ArrayList<String>>> respostas;
+    private final HashMap<Jogador, Pair<Integer, ArrayList<String>>> respostas;
 
-    public Rodada(int numero, long tempoDaRodada, int pontosPorAcerto, ArrayList<Socket> jogadores,
+    public Rodada(int numero, long tempoDaRodada, int pontosPorAcerto, ArrayList<Jogador> jogadores,
                   ArrayList<String> categorias, Runnable callbackDeFimDaRodada) {
 
-        this.respostas = new HashMap<Socket, Pair<Integer, ArrayList<String>>>();
+        this.respostas = new HashMap<Jogador, Pair<Integer, ArrayList<String>>>();
         this.callbackDeFimDaRodada = callbackDeFimDaRodada;
         this.pontosPorAcerto = pontosPorAcerto;
         this.tempoDaRodada = tempoDaRodada;
@@ -48,6 +41,10 @@ public class Rodada {
         this.numero = numero;
 
         this.inicialSorteada = this.sortearInicial();
+    }
+
+    public int obterPontosDoJogador(Jogador jogador) {
+        return this.respostas.get(jogador).getValue0();
     }
 
     /**
@@ -90,8 +87,10 @@ public class Rodada {
                         .setCharacter(this.inicialSorteada)
                         .setLista(this.categorias);
 
-                Utilitario.mandarMensagemParaJogador(jogador, mensagem);
-            } catch (IOException ignored) { }
+                Utilitario.mandarMensagemParaJogador(jogador.getSocket(), mensagem);
+            } catch (IOException ignored) {
+                ignored.printStackTrace();
+            }
         });
     }
 
@@ -103,7 +102,10 @@ public class Rodada {
             try {
                 Thread.sleep(this.tempoDaRodada);
                 this.interromperRespostaDosJogadores();
-            } catch (InterruptedException ignored) { }
+                this.enviarRelatorioDaRodada();
+            } catch (InterruptedException ignored) {
+                ignored.printStackTrace();
+            }
         });
 
         threadDeContagemDeTempo.start();
@@ -119,35 +121,22 @@ public class Rodada {
         this.jogadores.forEach(jogador -> {
             new Thread(() -> {
                 try {
-                    ArrayList<String> respostas = this.lerMensagem(jogador, ObjetivoMensagem.RESPOSTA_RODADA).lista;
+                    ArrayList<String> respostas = this.lerMensagem(jogador.getSocket(), ObjetivoMensagem.RESPOSTA_RODADA).lista;
                     int pontos = processarRespostas(respostas);
 
                     this.respostas.put(jogador, new Pair<Integer, ArrayList<String>>(pontos, respostas));
-                } catch (IOException | ClassNotFoundException ignored) { }
+                } catch (IOException | ClassNotFoundException ignored) {
+                    ignored.printStackTrace();
+                }
 
-                this.interromperRespostaDosJogadores(jogador);
+                this.interromperRespostaDosJogadores(jogador.getSocket());
 
                 this.enviarRelatorioDaRodada();
             }).start();
         });
     }
 
-    /**
-     * espera a resposta do jogador
-     * @param jogador socket do jogador
-     * @return Mensagem do jogador
-     */
-    @SuppressWarnings (value="unchecked")
-    private Mensagem lerMensagem(Socket jogador, ObjetivoMensagem objetivo) throws IOException, ClassNotFoundException {
-        ObjectInputStream jogadorInput = new ObjectInputStream(jogador.getInputStream());
-        Object objeto = jogadorInput.readObject();
 
-        if (!(objeto instanceof Mensagem) || (objetivo != null && ((Mensagem) objeto).objetivoMensagem != objetivo.obterValor())) {
-            throw new IllegalArgumentException();
-        }
-
-        return ((Mensagem) objeto);
-    }
 
     /**
      * envia uma mensagem para todos os jogadores para que eles parem de responder os itens da rodada.
@@ -170,11 +159,13 @@ public class Rodada {
         this.threadDeContagemDeTempo.interrupt();
 
         this.jogadores.forEach(jogadorRespondendo -> {
-            if (jogador == null || jogadorRespondendo != jogador) {
+            if (jogador == null || jogadorRespondendo.getSocket() != jogador) {
                 try {
                     Mensagem mensagem = new Mensagem(ObjetivoMensagem.PARAR_RESPOSTA_RODADA);
-                    Utilitario.mandarMensagemParaJogador(jogadorRespondendo, mensagem);
-                } catch (IOException ignored) { }
+                    Utilitario.mandarMensagemParaJogador(jogadorRespondendo.getSocket(), mensagem);
+                } catch (IOException ignored) {
+                    ignored.printStackTrace();
+                }
             }
         });
     }
@@ -200,30 +191,59 @@ public class Rodada {
 
         this.contagemDeConfirmacoes = 0;
 
-        // TODO: gerar relatorio
-        String relatorio = "RELATORIO RODADA";
+        StringBuilder relatorio = new StringBuilder("RELATORIO DA RODADA " + this.numero + "\n");
+        for (Jogador jogador : this.jogadores) {
+            relatorio.append(jogador.getNome()).append(": ");
+
+            int pontos = this.respostas.get(jogador) != null?
+                    this.respostas.get(jogador).getValue0() :
+                    0;
+
+            relatorio.append(pontos).append(" pts;\n");
+        }
 
         // mandar o relatorio para todos os jogadores
         this.jogadores.forEach(jogador -> {
             try {
                 Mensagem mensagem = new Mensagem(ObjetivoMensagem.RELATORIO_RODADA)
-                        .setConteudo(relatorio);
-                Utilitario.mandarMensagemParaJogador(jogador, mensagem);
-            } catch (IOException ignored) { }
+                        .setConteudo(relatorio.toString());
+                Utilitario.mandarMensagemParaJogador(jogador.getSocket(), mensagem);
+            } catch (IOException ignored) {
+                ignored.printStackTrace();
+            }
         });
 
         // esperar a confirmacao de todos os jogadores para poder iniciar a prox rodada
         this.jogadores.forEach(jogador -> {
             new Thread(() -> {
                 try {
-                    this.lerMensagem(jogador, ObjetivoMensagem.CONFIRMACAO_RELATORIO_RODADA);
+                    this.lerMensagem(jogador.getSocket(), ObjetivoMensagem.CONFIRMACAO_RELATORIO_RODADA);
                     this.contagemDeConfirmacoes++;
 
                     if (this.contagemDeConfirmacoes == this.jogadores.size()) {
                         this.callbackDeFimDaRodada.run();
                     }
-                } catch (IOException | ClassNotFoundException ignored) { }
+                } catch (IOException | ClassNotFoundException ignored) {
+                    ignored.printStackTrace();
+                }
             }).start();
         });
+    }
+
+    /**
+     * espera a resposta do jogador
+     * @param jogador socket do jogador
+     * @return Mensagem do jogador
+     */
+    @SuppressWarnings (value="unchecked")
+    public Mensagem lerMensagem(Socket jogador, ObjetivoMensagem objetivo) throws IOException, ClassNotFoundException {
+        ObjectInputStream jogadorInput = new ObjectInputStream(jogador.getInputStream());
+        Object objeto = jogadorInput.readObject();
+
+        if (!(objeto instanceof Mensagem) || (objetivo != null && ((Mensagem) objeto).objetivoMensagem != objetivo.obterValor())) {
+            throw new IllegalArgumentException();
+        }
+
+        return ((Mensagem) objeto);
     }
 }
